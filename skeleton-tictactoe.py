@@ -1,6 +1,8 @@
 # based on code from https://stackabuse.com/minimax-and-alpha-beta-pruning-in-python
 
 import time
+import numpy as np
+from skimage.util import view_as_windows
 
 class Game:
 	MINIMAX = 0
@@ -13,9 +15,9 @@ class Game:
 		self.recommend = recommend
 		
 	def initialize_game(self):
-		self.current_state = [['.','.','.'],
+		self.current_state = np.array([['.','.','.'],
 							  ['.','.','.'],
-							  ['.','.','.']]
+							  ['.','.','.']])
 		# Player X always plays first
 		self.player_turn = 'X'
 
@@ -35,37 +37,73 @@ class Game:
 		else:
 			return True
 
+	def isin_seq_v2(self, a,b):
+		return (view_as_windows(a,len(b))==b).all(1).any()
+
 	def is_end(self):
+		n = 3
+		s = 3
 		# Vertical win
-		for i in range(0, 3):
-			if (self.current_state[0][i] != '.' and
-				self.current_state[0][i] == self.current_state[1][i] and
-				self.current_state[1][i] == self.current_state[2][i]):
-				return self.current_state[0][i]
+		print("checking if game is ending...")    
+		for j in range(0, n):
+		    cons_pieces = 0
+		    for i in range(0, n):
+		        if self.current_state[i][j] != "-" and (i+1) < n and self.current_state[i][j] != '.':
+		            print("current_state[i][j]='",self.current_state[i][j],"' current_state[i+1][j]='",self.current_state[i+1][j],"'")
+		            if self.current_state[i][j] == self.current_state[i+1][j]:
+		                cons_pieces += 1
+		            if cons_pieces != 0 and self.current_state[i][j] != self.current_state[i+1][j]:
+		                cons_pieces = 0
+		        if cons_pieces+1 >= s:
+		            return self.current_state[i][j]
+
 		# Horizontal win
-		for i in range(0, 3):
-			if (self.current_state[i] == ['X', 'X', 'X']):
-				return 'X'
-			elif (self.current_state[i] == ['O', 'O', 'O']):
-				return 'O'
-		# Main diagonal win
-		if (self.current_state[0][0] != '.' and
-			self.current_state[0][0] == self.current_state[1][1] and
-			self.current_state[0][0] == self.current_state[2][2]):
-			return self.current_state[0][0]
-		# Second diagonal win
-		if (self.current_state[0][2] != '.' and
-			self.current_state[0][2] == self.current_state[1][1] and
-			self.current_state[0][2] == self.current_state[2][0]):
-			return self.current_state[0][2]
-		# Is whole board full?
-		for i in range(0, 3):
-			for j in range(0, 3):
-				# There's an empty field, we continue the game
-				if (self.current_state[i][j] == '.'):
-					return None
-		# It's a tie!
-		return '.'
+		for i in range(0, n):
+		    cons_pieces = 0
+		    for j in range(0, n):
+		        if self.current_state[i][j] != "-" and (j+1) < n and self.current_state[i][j] != '.':
+		            if self.current_state[i][j] == self.current_state[i][j+1]:
+		                cons_pieces += 1
+		            if cons_pieces != 0 and self.current_state[i][j] != self.current_state[i][j+1]:
+		                cons_pieces = 0
+		        if cons_pieces+1 >= s:
+		            return self.current_state[i][j]
+
+		# Diagonal win
+		max_col = len(self.current_state[0])
+		max_row = len(self.current_state)
+		cols = [[] for _ in range(max_col)]
+		rows = [[] for _ in range(max_row)]
+		fdiag = [[] for _ in range(max_row + max_col - 1)]
+		bdiag = [[] for _ in range(len(fdiag))]
+		min_bdiag = -max_row + 1
+
+		for x in range(max_col):
+		    for y in range(max_row):
+		        cols[x].append(self.current_state[y][x])
+		        rows[y].append(self.current_state[y][x])
+		        fdiag[x+y].append(self.current_state[y][x])
+		        bdiag[x-y-min_bdiag].append(self.current_state[y][x])
+
+		s_cons_x = np.full(s, "X", dtype='str_')
+		s_cons_o = np.full(s, "O", dtype='str_')   
+	        
+		for f in fdiag:
+		    if len(f) >= s:
+		        if self.isin_seq_v2(np.array(f), s_cons_x):
+		            print('X wins')
+		            return 'X'
+		        if self.isin_seq_v2(np.array(f), s_cons_o):
+		            print('O wins')
+		            return 'O'
+		for b in bdiag:
+		    if len(b) >= s:
+		        if self.isin_seq_v2(np.array(b), s_cons_x):
+		            print('X wins')
+		            return 'X'
+		        if self.isin_seq_v2(np.array(b), s_cons_o):
+		            print('O wins')
+		            return 'O'
 
 	def check_end(self):
 		self.result = self.is_end()
@@ -97,7 +135,16 @@ class Game:
 			self.player_turn = 'X'
 		return self.player_turn
 
-	def minimax(self, max=False):
+
+	def run_heuristic(self, x, y):
+		X_count = np.count_nonzero(self.current_state == 'X')
+		O_count = np.count_nonzero(self.current_state == 'O')
+		if max:
+			return (X_count - O_count)
+		else:
+			return (O_count - X_count)
+
+	def minimax(self,d, max=False):
 		# Minimizing for 'X' and maximizing for 'O'
 		# Possible values are:
 		# -1 - win for 'X'
@@ -109,26 +156,28 @@ class Game:
 			value = -2
 		x = None
 		y = None
-		result = self.is_end()
-		if result == 'X':
-			return (-1, x, y)
-		elif result == 'O':
-			return (1, x, y)
-		elif result == '.':
-			return (0, x, y)
+		depth = d
+
+		if depth == 0:
+			return (self.run_heuristic(x, y), x, y)
+
 		for i in range(0, 3):
 			for j in range(0, 3):
 				if self.current_state[i][j] == '.':
 					if max:
 						self.current_state[i][j] = 'O'
-						(v, _, _) = self.minimax(max=False)
+						# if depth >= 3:
+						# 	break
+						(v, _, _) = self.minimax(depth-1, max=False)
 						if v > value:
 							value = v
 							x = i
 							y = j
 					else:
 						self.current_state[i][j] = 'X'
-						(v, _, _) = self.minimax(max=True)
+						# if depth >= 3:
+						# 	break
+						(v, _, _) = self.minimax(depth-1, max=True)
 						if v < value:
 							value = v
 							x = i
@@ -186,6 +235,7 @@ class Game:
 		return (value, x, y)
 
 	def play(self,algo=None,player_x=None,player_o=None):
+		n = 3
 		if algo == None:
 			algo = self.ALPHABETA
 		if player_x == None:
@@ -199,14 +249,14 @@ class Game:
 			start = time.time()
 			if algo == self.MINIMAX:
 				if self.player_turn == 'X':
-					(_, x, y) = self.minimax(max=False)
+					(_, x, y) = self.minimax(2, max=False)
 				else:
-					(_, x, y) = self.minimax(max=True)
+					(_, x, y) = self.minimax(2, max=True)
 			else: # algo == self.ALPHABETA
 				if self.player_turn == 'X':
-					(m, x, y) = self.alphabeta(max=False)
+					(m, x, y) = self.alphabeta(2, max=False, d=2)
 				else:
-					(m, x, y) = self.alphabeta(max=True)
+					(m, x, y) = self.alphabeta(2, max=True)
 			end = time.time()
 			if (self.player_turn == 'X' and player_x == self.HUMAN) or (self.player_turn == 'O' and player_o == self.HUMAN):
 					if self.recommend:
@@ -221,7 +271,7 @@ class Game:
 
 def main():
 	g = Game(recommend=True)
-	g.play(algo=Game.ALPHABETA,player_x=Game.AI,player_o=Game.AI)
+	# g.play(algo=Game.ALPHABETA,player_x=Game.AI,player_o=Game.AI)
 	g.play(algo=Game.MINIMAX,player_x=Game.AI,player_o=Game.HUMAN)
 
 if __name__ == "__main__":
