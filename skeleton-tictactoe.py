@@ -11,20 +11,23 @@ class Game:
 	AI = 3
 	
 	def __init__(self, recommend = True):
-		self.initialize_game()
+		# self.initialize_game()
 		self.recommend = recommend
 		
 	def initialize_game(self):
-		self.current_state = np.array([['.','.','.'],
-							  ['.','.','.'],
-							  ['.','.','.']])
+		# n = 3
+		# self.current_state = np.array([['.','.','.'],
+		# 					  ['.','.','.'],
+		# 					  ['.','.','.']])
+		self.current_state = np.full([n, n], '.', dtype='str_')
 		# Player X always plays first
 		self.player_turn = 'X'
 
 	def draw_board(self):
+		# n = 3
 		print()
-		for y in range(0, 3):
-			for x in range(0, 3):
+		for y in range(0, n):
+			for x in range(0, n):
 				print(F'{self.current_state[x][y]}', end="")
 			print()
 		print()
@@ -37,11 +40,72 @@ class Game:
 		else:
 			return True
 
-	def isin_seq_v2(self, a,b):
+	def isin_seq_v2(self, a, b):
 		return (view_as_windows(a,len(b))==b).all(1).any()
 
+	def e1(self, x, y):
+		s = 3
+		V = 0
+
+		max_col = len(self.current_state[0])
+		max_row = len(self.current_state)
+		cols = [[] for _ in range(max_col)]
+		rows = [[] for _ in range(max_row)]
+		fdiag = [[] for _ in range(max_row + max_col - 1)]
+		bdiag = [[] for _ in range(len(fdiag))]
+		min_bdiag = -max_row + 1
+
+		for x in range(max_col):
+		    for y in range(max_row):
+		        cols[x].append(self.current_state[y][x])
+		        rows[y].append(self.current_state[y][x])
+		        fdiag[x+y].append(self.current_state[y][x])
+		        bdiag[x-y-min_bdiag].append(self.current_state[y][x])
+		        
+		for row in rows:
+		    for num in range(s,0,-1):
+		        if num == np.count_nonzero(np.array(row) == 'X'):
+		            V += (num*100)
+		            break
+		        else:
+		            if num == np.count_nonzero(np.array(row) == 'O'):
+		                V -= (num*100)
+		                break
+
+		for col in cols:
+		    for num in range(s,0,-1):
+		        if num == np.count_nonzero(np.array(col) == 'X'):
+		            V += (num*100)
+		            break
+		        else:
+		            if num == np.count_nonzero(np.array(col) == 'O'):
+		                V -= (num*100)
+		                break
+
+		for f in fdiag:
+		    for num in range(s,0,-1):
+		        if num == np.count_nonzero(np.array(f) == 'X'):
+		            V += (num*100)
+		            break
+		        else:
+		            if num == np.count_nonzero(np.array(f) == 'O'):
+		                V -= (num*100)
+		                break
+
+		for b in bdiag:
+		    for num in range(s,0,-1):
+		        if num == np.count_nonzero(np.array(b) == 'X'):
+		            V += (num*100)
+		            break
+		        else:
+		            if num == np.count_nonzero(np.array(b) == 'O'):
+		                V -= (num*100)
+		                break
+		# print(V)
+		return V
+
 	def is_end(self):
-		n = 3
+		# n = 3
 		s = 3
 		# Vertical win
 		print("checking if game is ending...")    
@@ -49,7 +113,7 @@ class Game:
 		    cons_pieces = 0
 		    for i in range(0, n):
 		        if self.current_state[i][j] != "-" and (i+1) < n and self.current_state[i][j] != '.':
-		            print("current_state[i][j]='",self.current_state[i][j],"' current_state[i+1][j]='",self.current_state[i+1][j],"'")
+		            # print("current_state[i][j]='",self.current_state[i][j],"' current_state[i+1][j]='",self.current_state[i+1][j],"'")
 		            if self.current_state[i][j] == self.current_state[i+1][j]:
 		                cons_pieces += 1
 		            if cons_pieces != 0 and self.current_state[i][j] != self.current_state[i+1][j]:
@@ -118,6 +182,26 @@ class Game:
 			self.initialize_game()
 		return self.result
 
+	def accept_parameters(self):
+		n = int(input('the size of the board:'))
+		# b = int(input('the number of blocs:'))
+		# for i in b:
+		# 	bpx = int(input('enter x coordinate for bloc {}):'.format(i)))
+		# 	bpy = int(input('enter y coordinate for bloc {}):'.format(i)))
+		# 	self.current_state[bpx][bpy]
+		# s = int(input('the winning line-up size:'))
+		# d1 = int(input('the maximum depth of the adversarial search for player 1:'))
+		# d2 = int(input('the maximum depth of the adversarial search for player 2:'))
+		# t = int(input('the maximum allowed time (in seconds) for your program to return a move:'))
+		# a = input("minimax (FALSE) or alphabeta (TRUE)?")
+		# if a == "TRUE":
+		# 	a = True
+		# if a == "FALSE":
+		# 	a = False
+		# mode = input('which play mode')
+		return n
+
+
 	def input_move(self):
 		while True:
 			print(F'Player {self.player_turn}, enter your move:')
@@ -145,24 +229,25 @@ class Game:
 			return (O_count - X_count)
 
 	def minimax(self,d, max=False):
+		# n = 3
 		# Minimizing for 'X' and maximizing for 'O'
 		# Possible values are:
 		# -1 - win for 'X'
 		# 0  - a tie
 		# 1  - loss for 'X'
 		# We're initially setting it to 2 or -2 as worse than the worst case:
-		value = 2
+		value = 10000
 		if max:
-			value = -2
+			value = -10000
 		x = None
 		y = None
 		depth = d
 
 		if depth == 0:
-			return (self.run_heuristic(x, y), x, y)
+			return (self.e1(x, y), x, y)
 
-		for i in range(0, 3):
-			for j in range(0, 3):
+		for i in range(0, n):
+			for j in range(0, n):
 				if self.current_state[i][j] == '.':
 					if max:
 						self.current_state[i][j] = 'O'
@@ -235,7 +320,9 @@ class Game:
 		return (value, x, y)
 
 	def play(self,algo=None,player_x=None,player_o=None):
-		n = 3
+		global n
+		n = self.accept_parameters()
+		self.initialize_game()
 		if algo == None:
 			algo = self.ALPHABETA
 		if player_x == None:
@@ -254,9 +341,9 @@ class Game:
 					(_, x, y) = self.minimax(2, max=True)
 			else: # algo == self.ALPHABETA
 				if self.player_turn == 'X':
-					(m, x, y) = self.alphabeta(2, max=False, d=2)
+					(m, x, y) = self.alphabeta(max=False)
 				else:
-					(m, x, y) = self.alphabeta(2, max=True)
+					(m, x, y) = self.alphabeta(max=True)
 			end = time.time()
 			if (self.player_turn == 'X' and player_x == self.HUMAN) or (self.player_turn == 'O' and player_o == self.HUMAN):
 					if self.recommend:
@@ -272,7 +359,7 @@ class Game:
 def main():
 	g = Game(recommend=True)
 	# g.play(algo=Game.ALPHABETA,player_x=Game.AI,player_o=Game.AI)
-	g.play(algo=Game.MINIMAX,player_x=Game.AI,player_o=Game.HUMAN)
+	g.play(algo=Game.MINIMAX,player_x=Game.AI,player_o=Game.AI)
 
 if __name__ == "__main__":
 	main()
