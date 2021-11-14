@@ -1,8 +1,16 @@
 # based on code from https://stackabuse.com/minimax-and-alpha-beta-pruning-in-python
-
+import os
 import time
 import numpy as np
+import random
 from skimage.util import view_as_windows
+
+total_eval_time = 0
+total_moves = 0
+total_dicts = {}
+total_h_eval = 0
+total_avg_eval_depth = 0
+global_filename = ""
 
 class Game:
 	MINIMAX = 0
@@ -19,13 +27,21 @@ class Game:
 		# Player X always plays first
 		self.player_turn = 'X'
 
-	def draw_board(self):
+	def draw_board(self, filename):
 		# n = 3
+		with open(filename, 'a') as f:
+			f.write('\n')
 		print()
 		for y in range(0, n):
 			for x in range(0, n):
+				with open(filename, 'a') as f:
+					f.write(F'{self.current_state[x][y]}')
 				print(F'{self.current_state[x][y]}', end="")
+			with open(filename, 'a') as f:
+				f.write('\n')
 			print()
+		with open(filename, 'a') as f:
+			f.write('\n')
 		print()
 		
 	def is_valid(self, px, py):
@@ -335,15 +351,21 @@ class Game:
 		# It's a tie!
 		return '.'
 
-	def check_end(self):
+	def check_end(self, filename):
 		self.result = self.is_end()
 		# Printing the appropriate message if the game has ended
 		if self.result != None:
 			if self.result == 'X':
+				with open(filename, 'a') as f:
+					f.write('The winner is X!')
 				print('The winner is X!')
 			elif self.result == 'O':
+				with open(filename, 'a') as f:
+					f.write('The winner is O!')
 				print('The winner is O!')
 			elif self.result == '.':
+				with open(filename, 'a') as f:
+					f.write("It's a tie!")
 				print("It's a tie!")
 			self.initialize_game()
 		return self.result
@@ -374,7 +396,7 @@ class Game:
 		else:
 			return (O_count - X_count)
 
-	def minimax(self, d, start, t, max=False):
+	def minimax(self, d, start, t, dicts, keys, depths=0, heuristic_eval=0, max=False):
 		# n = 3
 		# Minimizing for 'X' and maximizing for 'O'
 		# Possible values are:
@@ -389,8 +411,11 @@ class Game:
 		y = None
 		depth = d
 
+		h_eval = heuristic_eval
+		depth_count = depths
+
 		if depth == 0:
-			return (self.e2(), x, y)
+			return (self.e1(), x, y, h_eval, dicts, depth_count)
 
 		for i in range(0, n):
 			for j in range(0, n):
@@ -399,9 +424,13 @@ class Game:
 						self.current_state[i][j] = 'O'
 						if (time.time() - start) > t:
 							self.current_state[i][j] = '.'
+							depth_count += depth
 							depth = 0
-							return (value, x, y)
-						(v, _, _) = self.minimax(depth-1, start, t, max=False)
+							return (value, x, y, h_eval, dicts, depth_count)
+						# h_eval += 1
+						(v, _, _, h_eval, dicts, depth_count) = self.minimax(depth-1, start, t, dicts, keys, depth_count, heuristic_eval=h_eval, max=False)
+						dicts[depth] = h_eval
+						h_eval += 1	
 						if v > value:
 							value = v
 							x = i
@@ -410,24 +439,32 @@ class Game:
 						self.current_state[i][j] = 'X'
 						if (time.time() - start) > t:
 							self.current_state[i][j] = '.'
+							depth_count += depth
 							depth = 0
-							return (value, x, y)
-						(v, _, _) = self.minimax(depth-1, start, t, max=True)
+							return (value, x, y, h_eval, dicts, depth_count)
+						# h_eval += 1	
+						(v, _, _, h_eval, dicts, depth_count) = self.minimax(depth-1, start, t, dicts, keys, depth_count, heuristic_eval=h_eval, max=True)
+						dicts[depth] = h_eval
+						h_eval += 1	
 						if v < value:
 							value = v
 							x = i
 							y = j
 					self.current_state[i][j] = '.'
-		return (value, x, y)
+		# dicts[depth] = h_eval
+		return (value, x, y, h_eval, dicts, depth_count)
 
 	def accept_parameters(self):
 		n = int(input('the size of the board: '))
 		self.initialize_game(n)
 		b = int(input('the number of blocs: '))
+		blocs = ""
 		for i in range(b):
 			bpx = int(input('enter x coordinate for bloc {}: '.format(i+1)))
 			bpy = int(input('enter y coordinate for bloc {}: '.format(i+1)))
 			self.current_state[bpx][bpy] = '-'
+			blocs += F'({bpx},{bpy}) '
+		# print(F'blocs=[{blocs}]')
 		s = int(input('the winning line-up size:'))
 		d1 = int(input('the maximum depth of the adversarial search for player 1: '))
 		d2 = int(input('the maximum depth of the adversarial search for player 2: '))
@@ -438,7 +475,7 @@ class Game:
 		# if a == "FALSE":
 		# 	a = False
 		mode = input('which play mode (H-H, AI-AI, AI-H or H-AI)? ')
-		return n, s, d1, d2, t, a, mode
+		return n, s, b, blocs, d1, d2, t, a, mode
 
 	def alphabeta(self, d, alpha=-2, beta=2, max=False):
 		# Minimizing for 'X' and maximizing for 'O'
@@ -490,8 +527,22 @@ class Game:
 	def play(self,algo=None,player_x=None,player_o=None):
 		global n
 		global s
-		# self.initialize_game()
-		n, s, d1, d2, t, a, mode = self.accept_parameters()
+		global total_eval_time
+		global total_moves
+		global total_h_eval
+		global total_avg_eval_depth
+		global global_filename
+		n, s, b, blocs, d1, d2, t, a, mode = self.accept_parameters()
+
+		dirname = os.path.dirname(__file__)
+		filename = os.path.join(dirname, F'gameTrace{n}{b}{s}{t}.txt')
+		global_filename = filename
+		with open(filename, 'a') as f:
+			f.write(F'n={n} b={b} s={s} t={t}\n')
+			f.write(F'blocs={blocs.rstrip()}\n')
+
+		print(F'n={n} b={b} s={s} t={t}')
+		print(F'blocs={blocs.rstrip()}')
 
 		if mode =='AI-AI':
 			player_x = self.AI
@@ -506,6 +557,21 @@ class Game:
 			player_x = self.HUMAN
 			player_o = self.HUMAN
 
+		player_x_e = random.choice([1, 2])
+		player_o_e = random.choice([1, 2])
+
+		with open(filename, 'a') as f:
+			f.write(F'Player 1: AI d={d1} a={a} e{player_x_e}\n')
+			f.write(F'Player 2: AI d={d2} a={a} e{player_o_e}\n')
+
+		print(F'Player 1: AI d={d1} a={a} e{player_x_e}')
+		print(F'Player 2: AI d={d2} a={a} e{player_o_e}')
+
+		dicts_x = {}
+		dicts_o = {}
+		keys_x = range(d1+1)
+		keys_o = range(d2+1)
+
 		if a == 'TRUE':
 			algo = self.ALPHABETA
 		else:
@@ -518,17 +584,26 @@ class Game:
 		# if player_o == None:
 		# 	player_o = self.HUMAN
 		while True:
-			print("***************************")
-			self.draw_board()
-			print("***************************")
-			if self.check_end():
+			with open(filename, 'a') as f:
+				f.write(F"*********** MOVE #{total_moves} ****************\n")
+			print(F"*********** MOVE #{total_moves} ****************")
+			self.draw_board(filename)
+			if self.check_end(filename):
 				return
 			start = time.time()
 			if algo == self.MINIMAX:
 				if self.player_turn == 'X':
-					(_, x, y) = self.minimax(d1, start, t, max=False)
+					d = d1
+					(_, x, y, h_eval, dicts, depth_count) = self.minimax(d1, start, t, dicts_x, keys_x, max=False)
+					if x == None or y == None:
+						x = random.randint(0, n-1)
+						y = random.randint(0, n-1)
 				else:
-					(_, x, y) = self.minimax(d2, start, t, max=True)
+					d = d2
+					(_, x, y, h_eval, dicts, depth_count) = self.minimax(d2, start, t, dicts_o, keys_o, max=True)
+					if x == None or y == None:
+						x = random.randint(0, n-1)
+						y = random.randint(0, n-1)
 			else: # algo == self.ALPHABETA
 				if self.player_turn == 'X':
 					(m, x, y) = self.alphabeta(d1, max=False)
@@ -537,19 +612,53 @@ class Game:
 			end = time.time()
 			if (self.player_turn == 'X' and player_x == self.HUMAN) or (self.player_turn == 'O' and player_o == self.HUMAN):
 					if self.recommend:
-						print(F'Evaluation time: {round(end - start, 7)}s')
+						total_eval_time += (end - start)
+						total_avg_eval_depth += (depth_count/d)
+						total_h_eval += sum(dicts.values())
+						print(F'i Evaluation time: {round(end - start, 7)}s')
+						print(F'ii Heuristic evaluations: {sum(dicts.values())}')
+						print(f'iii Evaluations by depth: {dicts}')
+						print(F'iv Average evaluation depth: {round(depth_count/d, 3)}')
 						print(F'Recommended move: x = {x}, y = {y}')
 					(x,y) = self.input_move()
 			if (self.player_turn == 'X' and player_x == self.AI) or (self.player_turn == 'O' and player_o == self.AI):
-						print(F'Evaluation time: {round(end - start, 7)}s')
+						total_eval_time += (end - start)
+						total_avg_eval_depth += (depth_count/d)
+						total_h_eval += sum(dicts.values())
+						with open(filename, 'a') as f:
+							f.write(F'i Evaluation time: {round(end - start, 7)}s\n')
+							f.write(F'i Evaluation time: {round(end - start, 7)}s\n')
+							f.write(F'ii Heuristic evaluations: {sum(dicts.values())}\n')
+							f.write(f'iii Evaluations by depth: {dicts}\n')
+							f.write(F'iv Average evaluation depth: {round(depth_count/d, 3)}\n')
+							f.write(F'\n\nPlayer {self.player_turn} under AI control plays: x = {x}, y = {y}\n\n')
+
+						print(F'i Evaluation time: {round(end - start, 7)}s')
+						print(F'ii Heuristic evaluations: {sum(dicts.values())}')
+						print(f'iii Evaluations by depth: {dicts}')
+						print(F'iv Average evaluation depth: {round(depth_count/d, 3)}')
 						print(F'Player {self.player_turn} under AI control plays: x = {x}, y = {y}')
 			self.current_state[x][y] = self.player_turn
 			self.switch_player()
+			total_moves += 1
 
 def main():
+	global total_eval_time
+	global total_moves
 	g = Game(recommend=True)
 	# g.play(algo=Game.ALPHABETA,player_x=Game.AI,player_o=Game.AI)
 	g.play(algo=Game.MINIMAX)
+
+	with open(global_filename, 'a') as f:
+		f.write(F'\n\n6(b)i Average evaluation time: {round(total_eval_time/total_moves, 3)}s\n')
+		f.write(F'6(b)ii Total heuristic evaluations: {total_h_eval}\n')
+		f.write(F'6(b)iv Average evaluation depth: {round(total_avg_eval_depth/total_moves, 2)}\n')
+		f.write(F'6(b)vi Total moves: {total_moves}\n')
+
+	print(F'6(b)i Average evaluation time: {round(total_eval_time/total_moves, 3)}s')
+	print(F'6(b)ii Total heuristic evaluations: {total_h_eval}')
+	print(F'6(b)iv Average evaluation depth: {round(total_avg_eval_depth/total_moves, 2)}')
+	print(F'6(b)vi Total moves: {total_moves}')
 
 if __name__ == "__main__":
 	main()
