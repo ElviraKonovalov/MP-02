@@ -14,11 +14,7 @@ class Game:
 		# self.initialize_game()
 		self.recommend = recommend
 		
-	def initialize_game(self):
-		# n = 3
-		# self.current_state = np.array([['.','.','.'],
-		# 					  ['.','.','.'],
-		# 					  ['.','.','.']])
+	def initialize_game(self, n=3):
 		self.current_state = np.full([n, n], '.', dtype='str_')
 		# Player X always plays first
 		self.player_turn = 'X'
@@ -33,7 +29,7 @@ class Game:
 		print()
 		
 	def is_valid(self, px, py):
-		if px < 0 or px > 2 or py < 0 or py > 2:
+		if px < 0 or px > n-1 or py < 0 or py > n-1:
 			return False
 		elif self.current_state[px][py] != '.':
 			return False
@@ -43,9 +39,13 @@ class Game:
 	def isin_seq_v2(self, a, b):
 		return (view_as_windows(a,len(b))==b).all(1).any()
 
-	def e1(self, x, y):
-		s = 3
+	def e1(self):
+		# s = 3
+		# print("---------------board evaluating: \n")
+		# self.draw_board()
 		V = 0
+		# print("V before: ",V)
+
 
 		max_col = len(self.current_state[0])
 		max_row = len(self.current_state)
@@ -57,56 +57,214 @@ class Game:
 
 		for x in range(max_col):
 		    for y in range(max_row):
-		        cols[x].append(self.current_state[y][x])
-		        rows[y].append(self.current_state[y][x])
+		        rows[x].append(self.current_state[y][x])
+		        cols[y].append(self.current_state[y][x])
 		        fdiag[x+y].append(self.current_state[y][x])
 		        bdiag[x-y-min_bdiag].append(self.current_state[y][x])
 		        
 		for row in rows:
-		    for num in range(s,0,-1):
-		        if num == np.count_nonzero(np.array(row) == 'X'):
-		            V += (num*100)
-		            break
-		        else:
-		            if num == np.count_nonzero(np.array(row) == 'O'):
-		                V -= (num*100)
-		                break
+			# print(np.array(row))
+			for num in range(s,0,-1):
+				if num == np.count_nonzero(np.array(row) == 'O'):
+					V += (num*100)
+					break
+				else:
+					if num == np.count_nonzero(np.array(row) == 'X'):
+						V -= (num*100)
+						break
+			# print("----V after row evaluation: ",V)
 
 		for col in cols:
-		    for num in range(s,0,-1):
-		        if num == np.count_nonzero(np.array(col) == 'X'):
-		            V += (num*100)
-		            break
-		        else:
-		            if num == np.count_nonzero(np.array(col) == 'O'):
-		                V -= (num*100)
-		                break
+			# print(np.array(col))
+			for num in range(s,0,-1):
+				if num == np.count_nonzero(np.array(col) == 'O'):
+				    V += (num*100)
+				    break
+				else:
+					if num == np.count_nonzero(np.array(col) == 'X'):
+						V -= (num*100)
+						break
+			# print("----V after col evaluation: ",V)
 
 		for f in fdiag:
-		    for num in range(s,0,-1):
-		        if num == np.count_nonzero(np.array(f) == 'X'):
-		            V += (num*100)
-		            break
-		        else:
-		            if num == np.count_nonzero(np.array(f) == 'O'):
-		                V -= (num*100)
-		                break
+			if len(f) >= s:
+				# print(np.array(f))
+				for num in range(s,0,-1):
+					if num == np.count_nonzero(np.array(f) == 'O'):
+						V += (num*100)
+						break
+					else:
+						if num == np.count_nonzero(np.array(f) == 'X'):
+							V -= (num*100)
+							break
+			# print("----V after fdig evaluation: ",V)
 
 		for b in bdiag:
-		    for num in range(s,0,-1):
-		        if num == np.count_nonzero(np.array(b) == 'X'):
-		            V += (num*100)
-		            break
+			if len(b) >= s:
+				# print(np.array(b))
+				for num in range(s,0,-1):
+					if num == np.count_nonzero(np.array(b) == 'O'):
+						V += (num*100)
+						break
+					else:
+						if num == np.count_nonzero(np.array(b) == 'X'):
+							V -= (num*100)
+							break
+		# 	print("----V after bdig evaluation: ",V)
+		# print("V after: ",V)
+		# print("-----------")
+		return V
+
+
+
+	def e2(self):
+		V = 0
+		# evaluate horizontal potential win for X and O
+		for row in range(n):
+		    cons_pieces = 0
+		    for col in range(n):
+		        if self.current_state[row][col] == 'X' or self.current_state[row][col] == '.':
+		            cons_pieces += 1
 		        else:
-		            if num == np.count_nonzero(np.array(b) == 'O'):
-		                V -= (num*100)
-		                break
-		# print(V)
+		            cons_pieces = 0
+		            
+		        if cons_pieces >= s:
+		            V -= 100
+		        
+		    cons_pieces = 0
+		    for col in range(n):
+		        if self.current_state[row][col] == 'O' or self.current_state[row][col] == '.':
+		            cons_pieces += 1
+		        else:
+		            cons_pieces = 0
+		            
+		        if cons_pieces >= s:
+		            V += 100
+	    
+	    # evaluate vertical potential win for X and O    
+		for col in range(n):
+		    cons_pieces = 0
+		    for row in range(n):
+		        if self.current_state[row][col] == 'X' or self.current_state[row][col] == '.':
+		            cons_pieces += 1
+		        else:
+		            cons_pieces = 0
+		            
+		        if cons_pieces >= s:
+		            V -= 100
+		        
+		    cons_pieces = 0
+		    for row in range(n):
+		        if self.current_state[row][col] == 'O' or self.current_state[row][col] == '.':
+		            cons_pieces += 1
+		        else:
+		            cons_pieces = 0
+		            
+		        if cons_pieces >= s:
+		            V += 100
+
+		for row in range(n):
+		    cons_pieces = 0
+		    for col in range(n):
+		        r = row
+		        c = col
+		        while (r+1) < n and (c-1) >= 0:
+		            if self.current_state[r][c] == 'X' or self.current_state[r][c] == '.':
+		                cons_pieces += 1
+		            else:
+		                cons_pieces = 0
+		            r += 1
+		            c -= 1
+
+		        r = row
+		        c = col     
+		        while (r-1) >= 0 and (c+1) < n:
+		            if self.current_state[r][c] == 'X' or self.current_state[r][c] == '.':
+		                cons_pieces += 1
+		            else:
+		                cons_pieces = 0
+		            r -= 1
+		            c += 1
+		            
+		        if cons_pieces >= s:
+		            V -= 100
+		            
+		        r = row
+		        c = col
+		        while (r-1) >= 0 and (c-1) >= 0:
+		            if self.current_state[r][c] == 'X' or self.current_state[r][c] == '.':
+		                cons_pieces += 1
+		            else:
+		                cons_pieces = 0
+		            r -= 1
+		            c -= 1
+
+		        r = row
+		        c = col     
+		        while (r+1) < n and (c+1) < n:
+		            if self.current_state[r][c] == 'X' or self.current_state[r][c] == '.':
+		                cons_pieces += 1
+		            else:
+		                cons_pieces = 0
+		            r += 1
+		            c += 1
+		            
+		        if cons_pieces >= s:
+		            V -= 100
+		            
+		for row in range(n):
+		    cons_pieces = 0
+		    for col in range(n):
+		        r = row
+		        c = col
+		        while (r+1) < n and (c-1) >= 0:
+		            if self.current_state[r][c] == 'O' or self.current_state[r][c] == '.':
+		                cons_pieces += 1
+		            else:
+		                cons_pieces = 0
+		            r += 1
+		            c -= 1
+
+		        r = row
+		        c = col     
+		        while (r-1) >= 0 and (c+1) < n:
+		            if self.current_state[r][c] == 'O' or self.current_state[r][c] == '.':
+		                cons_pieces += 1
+		            else:
+		                cons_pieces = 0
+		            r -= 1
+		            c += 1
+		            
+		        if cons_pieces >= s:
+		            V += 100
+		            
+		        r = row
+		        c = col
+		        while (r-1) >= 0 and (c-1) >= 0:
+		            if self.current_state[r][c] == 'O' or self.current_state[r][c] == '.':
+		                cons_pieces += 1
+		            else:
+		                cons_pieces = 0
+		            r -= 1
+		            c -= 1
+
+		        r = row
+		        c = col     
+		        while (r+1) < n and (c+1) < n:
+		            if self.current_state[r][c] == 'O' or self.current_state[r][c] == '.':
+		                cons_pieces += 1
+		            else:
+		                cons_pieces = 0
+		            r += 1
+		            c += 1
+		            
+		        if cons_pieces >= s:
+		            V += 100
+		        
 		return V
 
 	def is_end(self):
-		# n = 3
-		s = 3
+
 		# Vertical win
 		print("checking if game is ending...")    
 		for j in range(0, n):
@@ -169,6 +327,14 @@ class Game:
 		            print('O wins')
 		            return 'O'
 
+		for i in range(0, n):
+			for j in range(0, n):
+				# There's an empty field, we continue the game
+				if (self.current_state[i][j] == '.'):
+					return None
+		# It's a tie!
+		return '.'
+
 	def check_end(self):
 		self.result = self.is_end()
 		# Printing the appropriate message if the game has ended
@@ -181,26 +347,6 @@ class Game:
 				print("It's a tie!")
 			self.initialize_game()
 		return self.result
-
-	def accept_parameters(self):
-		n = int(input('the size of the board:'))
-		# b = int(input('the number of blocs:'))
-		# for i in b:
-		# 	bpx = int(input('enter x coordinate for bloc {}):'.format(i)))
-		# 	bpy = int(input('enter y coordinate for bloc {}):'.format(i)))
-		# 	self.current_state[bpx][bpy]
-		# s = int(input('the winning line-up size:'))
-		# d1 = int(input('the maximum depth of the adversarial search for player 1:'))
-		# d2 = int(input('the maximum depth of the adversarial search for player 2:'))
-		# t = int(input('the maximum allowed time (in seconds) for your program to return a move:'))
-		# a = input("minimax (FALSE) or alphabeta (TRUE)?")
-		# if a == "TRUE":
-		# 	a = True
-		# if a == "FALSE":
-		# 	a = False
-		# mode = input('which play mode')
-		return n
-
 
 	def input_move(self):
 		while True:
@@ -228,7 +374,7 @@ class Game:
 		else:
 			return (O_count - X_count)
 
-	def minimax(self,d, max=False):
+	def minimax(self, d, start, t, max=False):
 		# n = 3
 		# Minimizing for 'X' and maximizing for 'O'
 		# Possible values are:
@@ -236,33 +382,37 @@ class Game:
 		# 0  - a tie
 		# 1  - loss for 'X'
 		# We're initially setting it to 2 or -2 as worse than the worst case:
-		value = 10000
+		value = 1000
 		if max:
-			value = -10000
+			value = -1000
 		x = None
 		y = None
 		depth = d
 
 		if depth == 0:
-			return (self.e1(x, y), x, y)
+			return (self.e2(), x, y)
 
 		for i in range(0, n):
 			for j in range(0, n):
 				if self.current_state[i][j] == '.':
 					if max:
 						self.current_state[i][j] = 'O'
-						# if depth >= 3:
-						# 	break
-						(v, _, _) = self.minimax(depth-1, max=False)
+						if (time.time() - start) > t:
+							self.current_state[i][j] = '.'
+							depth = 0
+							return (value, x, y)
+						(v, _, _) = self.minimax(depth-1, start, t, max=False)
 						if v > value:
 							value = v
 							x = i
 							y = j
 					else:
 						self.current_state[i][j] = 'X'
-						# if depth >= 3:
-						# 	break
-						(v, _, _) = self.minimax(depth-1, max=True)
+						if (time.time() - start) > t:
+							self.current_state[i][j] = '.'
+							depth = 0
+							return (value, x, y)
+						(v, _, _) = self.minimax(depth-1, start, t, max=True)
 						if v < value:
 							value = v
 							x = i
@@ -270,38 +420,56 @@ class Game:
 					self.current_state[i][j] = '.'
 		return (value, x, y)
 
-	def alphabeta(self, alpha=-2, beta=2, max=False):
+	def accept_parameters(self):
+		n = int(input('the size of the board: '))
+		self.initialize_game(n)
+		b = int(input('the number of blocs: '))
+		for i in range(b):
+			bpx = int(input('enter x coordinate for bloc {}: '.format(i+1)))
+			bpy = int(input('enter y coordinate for bloc {}: '.format(i+1)))
+			self.current_state[bpx][bpy] = '-'
+		s = int(input('the winning line-up size:'))
+		d1 = int(input('the maximum depth of the adversarial search for player 1: '))
+		d2 = int(input('the maximum depth of the adversarial search for player 2: '))
+		t = float(input('the maximum allowed time (in seconds) for your program to return a move: '))
+		a = input("minimax (FALSE) or alphabeta (TRUE)?")
+		# if a == "TRUE":
+		# 	a = True
+		# if a == "FALSE":
+		# 	a = False
+		mode = input('which play mode (H-H, AI-AI, AI-H or H-AI)? ')
+		return n, s, d1, d2, t, a, mode
+
+	def alphabeta(self, d, alpha=-2, beta=2, max=False):
 		# Minimizing for 'X' and maximizing for 'O'
 		# Possible values are:
 		# -1 - win for 'X'
 		# 0  - a tie
 		# 1  - loss for 'X'
 		# We're initially setting it to 2 or -2 as worse than the worst case:
-		value = 2
+		value = 1000
 		if max:
-			value = -2
+			value = -1000
 		x = None
 		y = None
-		result = self.is_end()
-		if result == 'X':
-			return (-1, x, y)
-		elif result == 'O':
-			return (1, x, y)
-		elif result == '.':
-			return (0, x, y)
-		for i in range(0, 3):
-			for j in range(0, 3):
+		depth = d
+
+		if depth == 0:
+			return (self.e1(), x, y)
+
+		for i in range(0, n):
+			for j in range(0, n):
 				if self.current_state[i][j] == '.':
 					if max:
 						self.current_state[i][j] = 'O'
-						(v, _, _) = self.alphabeta(alpha, beta, max=False)
+						(v, _, _) = self.alphabeta(depth-1, alpha, beta, max=False)
 						if v > value:
 							value = v
 							x = i
 							y = j
 					else:
 						self.current_state[i][j] = 'X'
-						(v, _, _) = self.alphabeta(alpha, beta, max=True)
+						(v, _, _) = self.alphabeta(depth-1, alpha, beta, max=True)
 						if v < value:
 							value = v
 							x = i
@@ -321,29 +489,51 @@ class Game:
 
 	def play(self,algo=None,player_x=None,player_o=None):
 		global n
-		n = self.accept_parameters()
-		self.initialize_game()
-		if algo == None:
-			algo = self.ALPHABETA
-		if player_x == None:
-			player_x = self.HUMAN
-		if player_o == None:
+		global s
+		# self.initialize_game()
+		n, s, d1, d2, t, a, mode = self.accept_parameters()
+
+		if mode =='AI-AI':
+			player_x = self.AI
+			player_o = self.AI
+		elif mode == 'AI-H':
+			player_x = self.AI
 			player_o = self.HUMAN
+		elif mode == 'H-AI':
+			player_x = self.HUMAN
+			player_o = self.AI
+		else:
+			player_x = self.HUMAN
+			player_o = self.HUMAN
+
+		if a == 'TRUE':
+			algo = self.ALPHABETA
+		else:
+			algo = self.MINIMAX
+
+		# if algo == None:
+		# 	algo = self.ALPHABETA
+		# if player_x == None:
+		# 	player_x = self.HUMAN
+		# if player_o == None:
+		# 	player_o = self.HUMAN
 		while True:
+			print("***************************")
 			self.draw_board()
+			print("***************************")
 			if self.check_end():
 				return
 			start = time.time()
 			if algo == self.MINIMAX:
 				if self.player_turn == 'X':
-					(_, x, y) = self.minimax(2, max=False)
+					(_, x, y) = self.minimax(d1, start, t, max=False)
 				else:
-					(_, x, y) = self.minimax(2, max=True)
+					(_, x, y) = self.minimax(d2, start, t, max=True)
 			else: # algo == self.ALPHABETA
 				if self.player_turn == 'X':
-					(m, x, y) = self.alphabeta(max=False)
+					(m, x, y) = self.alphabeta(d1, max=False)
 				else:
-					(m, x, y) = self.alphabeta(max=True)
+					(m, x, y) = self.alphabeta(d2, max=True)
 			end = time.time()
 			if (self.player_turn == 'X' and player_x == self.HUMAN) or (self.player_turn == 'O' and player_o == self.HUMAN):
 					if self.recommend:
@@ -359,8 +549,7 @@ class Game:
 def main():
 	g = Game(recommend=True)
 	# g.play(algo=Game.ALPHABETA,player_x=Game.AI,player_o=Game.AI)
-	g.play(algo=Game.MINIMAX,player_x=Game.AI,player_o=Game.AI)
+	g.play(algo=Game.MINIMAX)
 
 if __name__ == "__main__":
 	main()
-
