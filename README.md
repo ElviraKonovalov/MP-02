@@ -30,7 +30,7 @@ from skimage.util import view_as_windows
 
 ## Presentation and Discussion Files
 The following file is for Demo presentation purposes:
-1. `MP2-Presentation.ipynb`
+1. `MP2-Presentation.pdf`
 
 ## Author
 Alvira Konovalov<br>
