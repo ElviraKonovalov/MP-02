@@ -17,7 +17,6 @@ pip install numpy
 ```shell
 python3 line_em_up.py
 ```
-### Notes: 
 ## Imports
 The script requires the following packages and libraries:
 ```python
