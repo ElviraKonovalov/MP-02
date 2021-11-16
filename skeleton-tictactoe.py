@@ -3,6 +3,7 @@ import os
 import time
 import numpy as np
 import random
+import math
 from skimage.util import view_as_windows
 
 total_eval_time = 0
@@ -56,12 +57,7 @@ class Game:
 		return (view_as_windows(a,len(b))==b).all(1).any()
 
 	def e1(self):
-		# s = 3
-		# print("---------------board evaluating: \n")
-		# self.draw_board()
 		V = 0
-		# print("V before: ",V)
-
 
 		max_col = len(self.current_state[0])
 		max_row = len(self.current_state)
@@ -79,7 +75,6 @@ class Game:
 		        bdiag[x-y-min_bdiag].append(self.current_state[y][x])
 		        
 		for row in rows:
-			# print(np.array(row))
 			for num in range(s,0,-1):
 				if num == np.count_nonzero(np.array(row) == 'O'):
 					V += (num*100)
@@ -88,10 +83,8 @@ class Game:
 					if num == np.count_nonzero(np.array(row) == 'X'):
 						V -= (num*100)
 						break
-			# print("----V after row evaluation: ",V)
 
 		for col in cols:
-			# print(np.array(col))
 			for num in range(s,0,-1):
 				if num == np.count_nonzero(np.array(col) == 'O'):
 				    V += (num*100)
@@ -100,11 +93,9 @@ class Game:
 					if num == np.count_nonzero(np.array(col) == 'X'):
 						V -= (num*100)
 						break
-			# print("----V after col evaluation: ",V)
 
 		for f in fdiag:
 			if len(f) >= s:
-				# print(np.array(f))
 				for num in range(s,0,-1):
 					if num == np.count_nonzero(np.array(f) == 'O'):
 						V += (num*100)
@@ -113,11 +104,9 @@ class Game:
 						if num == np.count_nonzero(np.array(f) == 'X'):
 							V -= (num*100)
 							break
-			# print("----V after fdig evaluation: ",V)
 
 		for b in bdiag:
 			if len(b) >= s:
-				# print(np.array(b))
 				for num in range(s,0,-1):
 					if num == np.count_nonzero(np.array(b) == 'O'):
 						V += (num*100)
@@ -126,9 +115,7 @@ class Game:
 						if num == np.count_nonzero(np.array(b) == 'X'):
 							V -= (num*100)
 							break
-		# 	print("----V after bdig evaluation: ",V)
-		# print("V after: ",V)
-		# print("-----------")
+
 		return V
 
 
@@ -179,6 +166,7 @@ class Game:
 		        if cons_pieces >= s:
 		            V += 100
 
+        # evaluate potential diagonal win for X and O
 		for row in range(n):
 		    cons_pieces = 0
 		    for col in range(n):
@@ -388,32 +376,18 @@ class Game:
 		return self.player_turn
 
 
-	def run_heuristic(self, x, y):
-		X_count = np.count_nonzero(self.current_state == 'X')
-		O_count = np.count_nonzero(self.current_state == 'O')
+	def minimax(self, depth, start, t, dicts, keys, depths=0, heuristic_eval=0, max=False):
+		value = math.inf
 		if max:
-			return (X_count - O_count)
-		else:
-			return (O_count - X_count)
+			value = -math.inf
 
-	def minimax(self, d, start, t, dicts, keys, depths=0, heuristic_eval=0, max=False):
-		# n = 3
-		# Minimizing for 'X' and maximizing for 'O'
-		# Possible values are:
-		# -1 - win for 'X'
-		# 0  - a tie
-		# 1  - loss for 'X'
-		# We're initially setting it to 2 or -2 as worse than the worst case:
-		value = 1000
-		if max:
-			value = -1000
 		x = None
 		y = None
-		depth = d
 
 		h_eval = heuristic_eval
 		depth_count = depths
 
+		# if reached max depth
 		if depth == 0:
 			return (self.e1(), x, y, h_eval, dicts, depth_count)
 
@@ -422,12 +396,11 @@ class Game:
 				if self.current_state[i][j] == '.':
 					if max:
 						self.current_state[i][j] = 'O'
+						# check if time is not up
 						if (time.time() - start) > t:
 							self.current_state[i][j] = '.'
 							depth_count += depth
-							depth = 0
 							return (value, x, y, h_eval, dicts, depth_count)
-						# h_eval += 1
 						(v, _, _, h_eval, dicts, depth_count) = self.minimax(depth-1, start, t, dicts, keys, depth_count, heuristic_eval=h_eval, max=False)
 						dicts[depth] = h_eval
 						h_eval += 1	
@@ -437,12 +410,11 @@ class Game:
 							y = j
 					else:
 						self.current_state[i][j] = 'X'
+						# check if time is not up
 						if (time.time() - start) > t:
 							self.current_state[i][j] = '.'
 							depth_count += depth
-							depth = 0
 							return (value, x, y, h_eval, dicts, depth_count)
-						# h_eval += 1	
 						(v, _, _, h_eval, dicts, depth_count) = self.minimax(depth-1, start, t, dicts, keys, depth_count, heuristic_eval=h_eval, max=True)
 						dicts[depth] = h_eval
 						h_eval += 1	
@@ -451,7 +423,6 @@ class Game:
 							x = i
 							y = j
 					self.current_state[i][j] = '.'
-		# dicts[depth] = h_eval
 		return (value, x, y, h_eval, dicts, depth_count)
 
 	def accept_parameters(self):
@@ -464,49 +435,56 @@ class Game:
 			bpy = int(input('enter y coordinate for bloc {}: '.format(i+1)))
 			self.current_state[bpx][bpy] = '-'
 			blocs += F'({bpx},{bpy}) '
-		# print(F'blocs=[{blocs}]')
 		s = int(input('the winning line-up size:'))
 		d1 = int(input('the maximum depth of the adversarial search for player 1: '))
 		d2 = int(input('the maximum depth of the adversarial search for player 2: '))
 		t = float(input('the maximum allowed time (in seconds) for your program to return a move: '))
 		a = input("minimax (FALSE) or alphabeta (TRUE)?")
-		# if a == "TRUE":
-		# 	a = True
-		# if a == "FALSE":
-		# 	a = False
 		mode = input('which play mode (H-H, AI-AI, AI-H or H-AI)? ')
 		return n, s, b, blocs, d1, d2, t, a, mode
 
-	def alphabeta(self, d, alpha=-2, beta=2, max=False):
-		# Minimizing for 'X' and maximizing for 'O'
-		# Possible values are:
-		# -1 - win for 'X'
-		# 0  - a tie
-		# 1  - loss for 'X'
-		# We're initially setting it to 2 or -2 as worse than the worst case:
-		value = 1000
+	def alphabeta(self, depth, start, t, dicts, keys, depths=0, heuristic_eval=0, alpha=-2, beta=2, max=False):
+		value = math.inf
 		if max:
-			value = -1000
+			value = -math.inf
+
 		x = None
 		y = None
-		depth = d
 
+		h_eval = heuristic_eval
+		depth_count = depths
+
+		# if reached max depth
 		if depth == 0:
-			return (self.e1(), x, y)
+			return (self.e1(), x, y, h_eval, dicts, depth_count)
 
 		for i in range(0, n):
 			for j in range(0, n):
 				if self.current_state[i][j] == '.':
 					if max:
 						self.current_state[i][j] = 'O'
-						(v, _, _) = self.alphabeta(depth-1, alpha, beta, max=False)
+						# check if time is not up
+						if (time.time() - start) > t:
+							self.current_state[i][j] = '.'
+							depth_count += depth
+							return (value, x, y, h_eval, dicts, depth_count)
+						(v, _, _, h_eval, dicts, depth_count)  = self.alphabeta(depth-1, start, t, dicts, keys, depth_count, h_eval, alpha, beta, max=False)
+						dicts[depth] = h_eval
+						h_eval += 1	
 						if v > value:
 							value = v
 							x = i
 							y = j
 					else:
 						self.current_state[i][j] = 'X'
-						(v, _, _) = self.alphabeta(depth-1, alpha, beta, max=True)
+						# check if time is not up
+						if (time.time() - start) > t:
+							self.current_state[i][j] = '.'
+							depth_count += depth
+							return (value, x, y, h_eval, dicts, depth_count)
+						(v, _, _, h_eval, dicts, depth_count) = self.alphabeta(depth-1, start, t, dicts, keys, depth_count, h_eval, alpha, beta, max=True)
+						dicts[depth] = h_eval
+						h_eval += 1	
 						if v < value:
 							value = v
 							x = i
@@ -514,15 +492,15 @@ class Game:
 					self.current_state[i][j] = '.'
 					if max: 
 						if value >= beta:
-							return (value, x, y)
+							return (value, x, y, h_eval, dicts, depth_count)
 						if value > alpha:
 							alpha = value
 					else:
 						if value <= alpha:
-							return (value, x, y)
+							return (value, x, y, h_eval, dicts, depth_count)
 						if value < beta:
 							beta = value
-		return (value, x, y)
+		return (value, x, y, h_eval, dicts, depth_count)
 
 	def play(self,algo=None,player_x=None,player_o=None):
 		global n
@@ -577,12 +555,6 @@ class Game:
 		else:
 			algo = self.MINIMAX
 
-		# if algo == None:
-		# 	algo = self.ALPHABETA
-		# if player_x == None:
-		# 	player_x = self.HUMAN
-		# if player_o == None:
-		# 	player_o = self.HUMAN
 		while True:
 			with open(filename, 'a') as f:
 				f.write(F"*********** MOVE #{total_moves} ****************\n")
@@ -598,17 +570,37 @@ class Game:
 					if x == None or y == None:
 						x = random.randint(0, n-1)
 						y = random.randint(0, n-1)
+						while self.is_valid(x, y) == False:
+							x = random.randint(0, n-1)
+							y = random.randint(0, n-1)
 				else:
 					d = d2
 					(_, x, y, h_eval, dicts, depth_count) = self.minimax(d2, start, t, dicts_o, keys_o, max=True)
 					if x == None or y == None:
 						x = random.randint(0, n-1)
 						y = random.randint(0, n-1)
+						while self.is_valid(x, y) == False:
+							x = random.randint(0, n-1)
+							y = random.randint(0, n-1)
 			else: # algo == self.ALPHABETA
 				if self.player_turn == 'X':
-					(m, x, y) = self.alphabeta(d1, max=False)
+					d = d1
+					(m, x, y, h_eval, dicts, depth_count) = self.alphabeta(d1, start, t, dicts_x, keys_x, max=False)
+					if x == None or y == None:
+						x = random.randint(0, n-1)
+						y = random.randint(0, n-1)
+						while self.is_valid(x, y) == False:
+							x = random.randint(0, n-1)
+							y = random.randint(0, n-1)
 				else:
-					(m, x, y) = self.alphabeta(d2, max=True)
+					d = d2
+					(m, x, y, h_eval, dicts, depth_count) = self.alphabeta(d2, start, t, dicts_o, keys_o, max=True)
+					if x == None or y == None:
+						x = random.randint(0, n-1)
+						y = random.randint(0, n-1)
+						while self.is_valid(x, y) == False:
+							x = random.randint(0, n-1)
+							y = random.randint(0, n-1)
 			end = time.time()
 			if (self.player_turn == 'X' and player_x == self.HUMAN) or (self.player_turn == 'O' and player_o == self.HUMAN):
 					if self.recommend:
